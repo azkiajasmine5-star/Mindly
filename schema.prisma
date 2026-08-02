@@ -1,0 +1,196 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  INSTRUCTOR
+  ADMIN
+}
+
+model User {
+  id            String            @id @default(uuid())
+  email         String            @unique
+  passwordHash  String
+  name          String
+  role          Role              @default(USER)
+  xp            Int               @default(0)
+  level         Int               @default(1)
+  coins         Int               @default(0)
+  streakDays    Int               @default(0)
+  lastActive    DateTime          @default(now())
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  profile       Profile?
+  notes         Note[]
+  attempts      QuizAttempt[]
+  gameScores    GameScore[]
+  pomodoros     PomodoroSession[]
+  critiques     MediaCritique[]
+  posts         CommunityPost[]
+  notifications Notification[]
+  portfolio     Portfolio?
+  courses       Course[]
+  studyTasks    StudyTask[]
+}
+
+model Profile {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  avatar           String?
+  bio              String?
+  studyField       String?  // e.g. "Visual Communication Design"
+  portfolioWebsite String?
+  resumeUrl        String?
+}
+
+model Note {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  rawContent      String
+  summary         String?
+  keyPoints       Json?    // Array of key points
+  glossary        Json?    // Key-value terms
+  mindMap         Json?    // Node relations for charts
+  flashcards      Json?    // Array of {q, a}
+  isArchived      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Quiz {
+  id            String        @id @default(uuid())
+  title         String
+  description   String?
+  difficulty    String        // "EASY", "MEDIUM", "HARD"
+  questionCount Int
+  questions     Question[]
+  attempts      QuizAttempt[]
+  createdAt     DateTime      @default(now())
+}
+
+model Question {
+  id          String   @id @default(uuid())
+  quizId      String
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  type        String   // "MULTIPLE_CHOICE", "TRUE_FALSE", "MATCHING", "ESSAY"
+  content     String
+  options     Json?    // Choices for multiple choice
+  answer      String   // Correct answer key
+  explanation String?
+}
+
+model QuizAttempt {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId    String
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  score     Int
+  xpEarned  Int
+  duration  Int      // Seconds taken
+  createdAt DateTime @default(now())
+}
+
+model GameScore {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameName  String   // "MEMORY_MATCH", "ESCAPE_ROOM"
+  score     Int
+  xpEarned  Int
+  createdAt DateTime @default(now())
+}
+
+model PomodoroSession {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  duration  Int      // in minutes
+  musicType String   // "LOFI", "RAIN", "FOREST", "CAFE"
+  createdAt DateTime @default(now())
+}
+
+model MediaCritique {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mediaType       String   // "POSTER", "VIDEO", "UIUX", "STORYBOARD"
+  mediaUrl        String
+  critiqueScore   Int
+  critiqueText    String
+  suggestions     Json     // Detail suggestion items
+  createdAt       DateTime @default(now())
+}
+
+model Portfolio {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aboutText    String?
+  projects     Json?    // [{ title, link, desc, image, role }]
+  skills       Json?    // [{ name, level }]
+  experiences  Json?    // [{ company, role, duration, description }]
+  certificates Json?    // [{ name, issuer, date }]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model CommunityPost {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  content   String
+  parentId  String?  // For nested discussion thread replies
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Course {
+  id          String      @id @default(uuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code        String      // e.g., "MD-302"
+  name        String      // e.g., "3D Animation Principles"
+  description String?
+  credits     Int         @default(3)
+  semester    Int         @default(1) // Semester number
+  grade       String?     // e.g., "A", "B+"
+  tasks       StudyTask[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model StudyTask {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId    String?
+  course      Course?   @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  title       String
+  description String?
+  deadline    DateTime
+  priority    String    @default("MEDIUM") // "LOW", "MEDIUM", "HIGH"
+  isCompleted Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
